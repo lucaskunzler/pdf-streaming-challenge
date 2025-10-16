@@ -1,32 +1,10 @@
 import fastify, { FastifyInstance } from 'fastify';
 import fs from 'fs/promises';
 import path from 'path';
-import crypto from 'crypto';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { parseRange } from './utils/range.js';
+import { getPdfPageCount } from './utils/pdf.js';
+import { generateETag, validateDocument, createErrorResponse } from './utils/document.js';
 
-// PDF.js page counting function
-async function getPdfPageCount(filePath: string): Promise<number> {
-  try {
-    const buffer = await fs.readFile(filePath);
-    
-    // Convert Buffer to Uint8Array as required by PDF.js
-    const uint8Array = new Uint8Array(buffer);
-    
-    const loadingTask = pdfjs.getDocument({
-      data: uint8Array,
-      verbosity: 0 // Suppress console output
-    });
-    
-    const pdf = await loadingTask.promise;
-    return pdf.numPages;
-    
-  } catch (error) {
-    const filename = path.basename(filePath);
-    console.error(`PDF parsing failed for ${filename}:`, error);
-    
-    throw new Error(`Unable to extract page count from PDF: ${filename}`);
-  }
-}
 
 interface AppConfig {
   documentsPath?: string;
@@ -38,10 +16,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     logger: config.logger !== undefined ? config.logger : true 
   });
   
-  // Configure document storage path - defaults to a production-ready location
   const documentsPath = config.documentsPath || process.env.DOCUMENTS_PATH || path.join(process.cwd(), 'documents');
-
-  // Health endpoint
   app.get('/health', async () => {
     return {
       status: 'ok',
@@ -49,65 +24,100 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     };
   });
 
-  // Document Metadata API
   app.get('/api/documents/:id/metadata', async (request, reply) => {
     const { id } = request.params as { id: string };
-    
-    // Path to document
     const documentPath = path.join(documentsPath, id);
     
     try {
-      // Check if file exists and get stats
-      const stats = await fs.stat(documentPath);
-      
-      if (!stats.isFile()) {
-        return reply.status(404).send({
-          error: 'Document not found',
-          statusCode: 404
-        });
-      }
-
-      // Extract page count from PDF
+      const stats = await validateDocument(documentPath);
       const pageCount = await getPdfPageCount(documentPath);
+      const etag = generateETag(stats);
       
-      // Generate ETag from file stats
-      const etag = `"${crypto.createHash('md5').update(`${stats.size}-${stats.mtime.getTime()}`).digest('hex')}"`;
-      
-      // Handle conditional requests (304 Not Modified)
       const ifNoneMatch = request.headers['if-none-match'];
       if (ifNoneMatch === etag) {
         return reply.status(304).send('');
       }
       
-      // Set cache headers
       reply.header('etag', etag);
       reply.header('cache-control', 'public, max-age=3600');
       reply.header('content-type', 'application/json; charset=utf-8');
       
-      // Return metadata
       return {
         id,
         filename: path.basename(documentPath),
         pageCount,
         fileSize: stats.size,
         lastModified: stats.mtime.toISOString(),
-        etag: etag
+        etag
       };
       
     } catch (error) {
-      // File doesn't exist or PDF processing failed
-      const isFileError = (error as NodeJS.ErrnoException).code === 'ENOENT';
-      return reply.status(isFileError ? 404 : 500).send({
-        error: isFileError ? 'Document not found' : 'PDF processing failed',
-        statusCode: isFileError ? 404 : 500
+      const { status, body } = createErrorResponse(error, 'metadata');
+      return reply.status(status).send(body);
+    }
+  });
+
+  app.get('/api/documents/:id/range', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const rangeHeader = request.headers['range'] as string;
+    
+    if (!rangeHeader) {
+      return reply.status(400).send({
+        error: 'Range header required',
+        statusCode: 400
       });
+    }
+
+    const documentPath = path.join(documentsPath, id);
+    
+    try {
+      const stats = await validateDocument(documentPath);
+      const range = parseRange(rangeHeader, stats.size);
+      
+      if (!range || range.start >= stats.size || range.end >= stats.size) {
+        return reply.status(416)
+          .header('content-range', `bytes */${stats.size}`)
+          .send({
+            error: 'Range not satisfiable',
+            statusCode: 416
+          });
+      }
+
+      const etag = generateETag(stats);
+      const ifRange = request.headers['if-range'];
+      
+      if (ifRange && ifRange !== etag) {
+        return reply.status(416).send({
+          error: 'Range not satisfiable',
+          statusCode: 416
+        });
+      }
+
+      const contentLength = range.end - range.start + 1;
+      const fileHandle = await fs.open(documentPath, 'r');
+      const buffer = Buffer.alloc(contentLength);
+      await fileHandle.read(buffer, 0, contentLength, range.start);
+      await fileHandle.close();
+
+      reply.status(206)
+        .header('content-type', 'application/pdf')
+        .header('accept-ranges', 'bytes')
+        .header('content-range', `bytes ${range.start}-${range.end}/${stats.size}`)
+        .header('content-length', contentLength.toString())
+        .header('etag', etag)
+        .header('last-modified', stats.mtime.toUTCString())
+        .header('cache-control', 'public, max-age=3600');
+
+      return reply.send(buffer);
+      
+    } catch (error) {
+      const { status, body } = createErrorResponse(error, 'range');
+      return reply.status(status).send(body);
     }
   });
 
   return app;
 }
-
-
 
 // Start server if this file is run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
