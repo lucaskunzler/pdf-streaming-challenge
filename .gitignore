@@ -1,0 +1,8 @@
+.DS_Store
+
+backend/node_modules
+
+
+/docs
+/frontend
+/infra
