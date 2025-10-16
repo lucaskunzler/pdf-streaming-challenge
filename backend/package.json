@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "PDF streaming backend with HTTP range support",
   "main": "dist/app.js",
+  "type": "module",
   "scripts": {
+    "start": "node dist/app.js",
     "dev": "tsx watch src/app.ts",
     "build": "tsc",
     "test": "vitest",
@@ -13,19 +15,20 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "dependencies": {
-    "fastify": "^4.24.3"
+    "fastify": "^5.1.0",
+    "pdfjs-dist": "^5.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.8.0",
-    "@typescript-eslint/eslint-plugin": "^6.9.0",
-    "@typescript-eslint/parser": "^6.9.0",
-    "eslint": "^8.52.0",
-    "supertest": "^6.3.3",
-    "@types/supertest": "^2.0.15",
-    "tsx": "^4.0.0",
-    "typescript": "^5.2.2",
-    "vitest": "^0.34.6",
-    "@vitest/coverage-v8": "^0.34.6"
+    "@types/node": "^24.8.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "eslint": "^9.37.0",
+    "supertest": "^7.1.4",
+    "@types/supertest": "^6.0.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.4"
   },
   "keywords": ["pdf", "streaming", "backend", "api"],
   "author": "",
