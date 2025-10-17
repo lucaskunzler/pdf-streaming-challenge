@@ -1,6 +1,5 @@
 import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import fs from 'fs/promises';
 import path from 'path';
 import { parseRange } from './utils/range.js';
 import { getPdfPageCount } from './utils/pdf.js';
@@ -62,6 +61,30 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     }
   });
 
+  // Handle HEAD requests for getting file info without downloading
+  app.head('/api/documents/:id/range', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const documentPath = path.join(documentsPath, id);
+    
+    try {
+      const stats = await validateDocument(documentPath);
+      const etag = generateETag(stats);
+      
+      return reply
+        .status(200)
+        .header('content-type', 'application/pdf')
+        .header('accept-ranges', 'bytes')
+        .header('content-length', stats.size.toString())
+        .header('etag', etag)
+        .header('last-modified', stats.mtime.toUTCString())
+        .header('cache-control', 'public, max-age=3600')
+        .send();
+    } catch (error) {
+      const { status, body } = createErrorResponse(error, 'range');
+      return reply.status(status).send(body);
+    }
+  });
+
   app.get('/api/documents/:id/range', async (request, reply) => {
     const { id } = request.params as { id: string };
     const rangeHeader = request.headers['range'] as string;
@@ -71,10 +94,9 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       const stats = await validateDocument(documentPath);
       const etag = generateETag(stats);
       
-      // If no Range header, return full file with Accept-Ranges header
-      // This tells PDF.js that range requests are supported
       if (!rangeHeader) {
-        const fileBuffer = await fs.readFile(documentPath);
+        // Stream the file without loading it entirely into memory
+        const stream = (await import('fs')).createReadStream(documentPath);
         
         return reply
           .status(200)
@@ -84,7 +106,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
           .header('etag', etag)
           .header('last-modified', stats.mtime.toUTCString())
           .header('cache-control', 'public, max-age=3600')
-          .send(fileBuffer);
+          .send(stream);
       }
       
       // Handle Range request
@@ -109,10 +131,12 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       }
 
       const contentLength = range.end - range.start + 1;
-      const fileHandle = await fs.open(documentPath, 'r');
-      const buffer = Buffer.alloc(contentLength);
-      await fileHandle.read(buffer, 0, contentLength, range.start);
-      await fileHandle.close();
+      
+      // Stream the range without loading it entirely into memory
+      const stream = (await import('fs')).createReadStream(documentPath, {
+        start: range.start,
+        end: range.end
+      });
 
       reply.status(206)
         .header('content-type', 'application/pdf')
@@ -123,7 +147,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
         .header('last-modified', stats.mtime.toUTCString())
         .header('cache-control', 'public, max-age=3600');
 
-      return reply.send(buffer);
+      return reply.send(stream);
       
     } catch (error) {
       const { status, body } = createErrorResponse(error, 'range');

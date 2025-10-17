@@ -21,6 +21,20 @@ describe('HTTP Range Support API', () => {
   });
 
   describe('GET /api/documents/:id/range', () => {
+    it('should support HEAD requests to get file info without downloading', async () => {
+      const response = await app.inject({
+        method: 'HEAD',
+        url: '/api/documents/tiny-1p.pdf/range'
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toBe('application/pdf');
+      expect(response.headers['accept-ranges']).toBe('bytes');
+      expect(response.headers['content-length']).toBe('1870');
+      expect(response.headers['etag']).toBeDefined();
+      expect(response.body).toBe('');
+    });
+
     it('should return 404 for non-existent document', async () => {
       const response = await app.inject({
         method: 'GET',
@@ -33,7 +47,7 @@ describe('HTTP Range Support API', () => {
       expect(body.error).toBe('Document not found');
     });
 
-    it('should return 200 with full file when no Range header (for PDF.js compatibility)', async () => {
+    it('should return 200 with full file when no Range header (signals range support)', async () => {
       const response = await app.inject({
         method: 'GET',
         url: '/api/documents/tiny-1p.pdf/range'
