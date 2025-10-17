@@ -65,18 +65,29 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
   app.get('/api/documents/:id/range', async (request, reply) => {
     const { id } = request.params as { id: string };
     const rangeHeader = request.headers['range'] as string;
-    
-    if (!rangeHeader) {
-      return reply.status(400).send({
-        error: 'Range header required',
-        statusCode: 400
-      });
-    }
-
     const documentPath = path.join(documentsPath, id);
     
     try {
       const stats = await validateDocument(documentPath);
+      const etag = generateETag(stats);
+      
+      // If no Range header, return full file with Accept-Ranges header
+      // This tells PDF.js that range requests are supported
+      if (!rangeHeader) {
+        const fileBuffer = await fs.readFile(documentPath);
+        
+        return reply
+          .status(200)
+          .header('content-type', 'application/pdf')
+          .header('accept-ranges', 'bytes')
+          .header('content-length', stats.size.toString())
+          .header('etag', etag)
+          .header('last-modified', stats.mtime.toUTCString())
+          .header('cache-control', 'public, max-age=3600')
+          .send(fileBuffer);
+      }
+      
+      // Handle Range request
       const range = parseRange(rangeHeader, stats.size);
       
       if (!range || range.start >= stats.size || range.end >= stats.size) {
@@ -88,7 +99,6 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
           });
       }
 
-      const etag = generateETag(stats);
       const ifRange = request.headers['if-range'];
       
       if (ifRange && ifRange !== etag) {

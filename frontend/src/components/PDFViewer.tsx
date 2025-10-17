@@ -25,9 +25,7 @@ export const PDFViewer = ({ url, onMetadataLoad }: PDFViewerProps) => {
 
   const documentOptions = useMemo(
     () => ({
-      httpHeaders: {
-        Range: `bytes=0-`,
-      },
+      httpHeaders: {},
       withCredentials: false,
     }),
     []

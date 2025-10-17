@@ -1,6 +1,7 @@
-import { FileText, Hash, HardDrive, Calendar } from "lucide-react";
+import { FileText, Hash, HardDrive, Calendar, Tag, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 interface PDFSidebarProps {
   metadata: {
@@ -8,6 +9,8 @@ interface PDFSidebarProps {
     numPages: number;
     fileSize?: number;
     loadedAt: Date;
+    etag?: string;
+    lastModified?: string;
   };
 }
 
@@ -83,12 +86,51 @@ export const PDFSidebar = ({ metadata }: PDFSidebarProps) => {
                 <div className="text-sm">{formatDate(metadata.loadedAt)}</div>
               </div>
             </div>
+
+            {metadata.lastModified && (
+              <>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div className="space-y-1 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Last Modified
+                    </div>
+                    <div className="text-sm">
+                      {formatDate(new Date(metadata.lastModified))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {metadata.etag && (
+              <>
+                <Separator />
+                <div className="flex items-start gap-3">
+                  <Tag className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div className="space-y-1 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      ETag
+                    </div>
+                    <div className="text-xs font-mono bg-muted px-2 py-1 rounded break-all">
+                      {metadata.etag}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
 
       <Card className="mt-6 border-none shadow-none bg-card/50">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              HTTP Range Requests
+            </Badge>
+          </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             This PDF viewer supports byte range requests for efficient loading. Only the
             current page is loaded into memory at a time.

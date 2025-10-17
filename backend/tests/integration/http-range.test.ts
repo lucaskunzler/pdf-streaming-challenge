@@ -33,15 +33,18 @@ describe('HTTP Range Support API', () => {
       expect(body.error).toBe('Document not found');
     });
 
-    it('should return 400 for missing Range header', async () => {
+    it('should return 200 with full file when no Range header (for PDF.js compatibility)', async () => {
       const response = await app.inject({
         method: 'GET',
         url: '/api/documents/tiny-1p.pdf/range'
       });
 
-      expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.body);
-      expect(body.error).toBe('Range header required');
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toBe('application/pdf');
+      expect(response.headers['accept-ranges']).toBe('bytes');
+      expect(response.headers['content-length']).toBe('1870');
+      expect(response.rawPayload).toBeInstanceOf(Buffer);
+      expect(response.rawPayload.length).toBe(1870);
     });
 
     it('should return 416 for invalid range', async () => {
