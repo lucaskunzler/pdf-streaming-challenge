@@ -1,4 +1,5 @@
 import fastify, { FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import fs from 'fs/promises';
 import path from 'path';
 import { parseRange } from './utils/range.js';
@@ -14,6 +15,10 @@ interface AppConfig {
 export function createApp(config: AppConfig = {}): FastifyInstance {
   const app = fastify({ 
     logger: config.logger !== undefined ? config.logger : true 
+  });
+  
+  app.register(cors, {
+    origin: true
   });
   
   const documentsPath = config.documentsPath || process.env.DOCUMENTS_PATH || path.join(process.cwd(), 'documents');

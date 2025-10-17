@@ -15,22 +15,28 @@
     "lint:fix": "eslint src --ext .ts --fix"
   },
   "dependencies": {
+    "@fastify/cors": "^11.1.0",
     "fastify": "^5.1.0",
     "pdfjs-dist": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.8.0",
+    "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.37.0",
     "supertest": "^7.1.4",
-    "@types/supertest": "^6.0.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^3.2.4",
-    "@vitest/coverage-v8": "^3.2.4"
+    "vitest": "^3.2.4"
   },
-  "keywords": ["pdf", "streaming", "backend", "api"],
+  "keywords": [
+    "pdf",
+    "streaming",
+    "backend",
+    "api"
+  ],
   "author": "",
   "license": "MIT"
 }

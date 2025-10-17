@@ -3,6 +3,7 @@
 backend/node_modules
 backend/dist
 backend/coverage
+backend/documents
 
 /docs
 /infra
