@@ -26,7 +26,7 @@ Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second f
 
 ```
 ┌─────────────────┐    HTTP Range    ┌──────────────────┐    File I/O    ┌─────────────┐
-│  React + PDF.js │ ◄──────────────► │   Fastify API    │ ◄─────────────► │ S3 / Local  │
+│  React + PDF.js │ ◄──────────────► │   Fastify API    │ ◄────────────► │ S3 / Local  │
 │   (Browser)     │    Requests      │   (Range Proxy)  │                │     FS      │
 └─────────────────┘                  └──────────────────┘                └─────────────┘
 ```
