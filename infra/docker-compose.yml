@@ -1,0 +1,49 @@
+services:
+  backend:
+    build: ../backend
+    container_name: pdf-streaming-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DOCUMENTS_PATH=/app/documents
+    volumes:
+      - ../backend/documents:/app/documents:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - pdf-streaming-network
+
+  frontend:
+    build: ../frontend
+    container_name: pdf-streaming-frontend
+    ports:
+      - "8080:80"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - pdf-streaming-network
+
+networks:
+  pdf-streaming-network:
+    driver: bridge
+
+volumes:
+  backend-documents:
+    driver: local
+
