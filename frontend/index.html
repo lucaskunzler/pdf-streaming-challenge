@@ -1,24 +1,61 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDF Viewer - Professional Document Reader</title>
-    <meta name="description" content="Professional PDF viewer with page navigation and metadata display" />
-    <meta name="author" content="Lovable" />
-
-    <meta property="og:title" content="9482350e-19d8-47c7-be43-39028a59facf" />
-    <meta property="og:description" content="Lovable Generated Project" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <title>PDF Viewer in JavaScript</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
+      integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link rel="stylesheet" href="style.css" />
   </head>
-
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <header>
+      <ul class="navigation">
+        <li class="navigation__item doc-info">
+          <span id="doc_filename">Loading...</span>
+          <span id="doc_size"></span>
+        </li>
+
+        <li class="navigation__item">
+          <!-- Navigate to the Previous and Next pages -->
+          <a href="#" class="previous round" id="prev_page"
+            ><i class="fas fa-arrow-left"></i
+          ></a>
+
+          <!-- Navigate to a specific page -->
+          <input type="number" value="1" id="current_page" />
+
+          <a href="#" class="next round" id="next_page"
+            ><i class="fas fa-arrow-right"></i
+          ></a>
+
+          <!-- Page Info -->
+          Page <span id="page_num"></span> of
+          <span id="page_count"></span>
+        </li>
+
+        <!-- Zoom In and Out -->
+        <li class="navigation__item">
+          <button class="zoom" id="zoom_in">
+            <i class="fas fa-search-plus"></i>
+          </button>
+
+          <button class="zoom" id="zoom_out">
+            <i class="fas fa-search-minus"></i>
+          </button>
+        </li>
+      </ul>
+    </header>
+
+    <!-- canvas to place the PDF -->
+    <canvas id="canvas" class="canvas__container"></canvas>
+
+    <script type="module" src="index.js"></script>
   </body>
 </html>

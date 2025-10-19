@@ -17,7 +17,8 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
   });
   
   app.register(cors, {
-    origin: true
+    origin: true,
+    exposedHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length', 'Content-Encoding']
   });
   
   const documentsPath = config.documentsPath || process.env.DOCUMENTS_PATH || path.join(process.cwd(), 'documents');
