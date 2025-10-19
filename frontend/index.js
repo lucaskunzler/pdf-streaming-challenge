@@ -1,8 +1,15 @@
-const pdf = "document.pdf";
+// Configuration for backend API
+const BACKEND_URL = "http://localhost:3000";
+const DOCUMENT_ID = "large-361p-12mb.pdf"; // Change this to load different documents
 
-import { GlobalWorkerOptions } from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.min.mjs';
+// Import PDF.js from CDN (v5.4.296 - latest as of Oct 2025)
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.min.mjs';
 
-GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.5.136/build/pdf.worker.min.mjs';
+// Set worker source to CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.worker.min.mjs';
+
+// PDF URL from backend API that supports range requests
+const pdfUrl = `${BACKEND_URL}/api/documents/${DOCUMENT_ID}/range`;
 
 const pageNum = document.querySelector("#page_num");
 const pageCount = document.querySelector("#page_count");
@@ -11,7 +18,6 @@ const previousPage = document.querySelector("#prev_page");
 const nextPage = document.querySelector("#next_page");
 const zoomIn = document.querySelector("#zoom_in");
 const zoomOut = document.querySelector("#zoom_out");
-const printButton = document.querySelector(".print-button");
 
 const initialState = {
   pdfDoc: null,
@@ -46,19 +52,25 @@ const renderPage = () => {
   });
 };
 
-// Load the Document
+// Load the Document from backend API with range request support
 pdfjsLib
-  .getDocument(pdf)
+  .getDocument({
+    url: pdfUrl,
+    rangeChunkSize: 65536, // 64KB chunks - optimizes range requests
+    disableAutoFetch: true, // Only fetch data when needed
+    disableStream: false,   // Enable streaming
+  })
   .promise.then((data) => {
     initialState.pdfDoc = data;
-    console.log("pdfDocument", initialState.pdfDoc);
+    console.log("pdfDocument loaded from backend API", initialState.pdfDoc);
 
     pageCount.textContent = initialState.pdfDoc.numPages;
 
     renderPage();
   })
   .catch((err) => {
-    alert(err.message);
+    console.error("Error loading PDF:", err);
+    alert(`Failed to load PDF: ${err.message}`);
   });
 
 const showPrevPage = () => {
