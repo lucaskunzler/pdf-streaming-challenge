@@ -1,19 +1,15 @@
-import fs from 'fs/promises';
-import path from 'path';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getS3ObjectBuffer, getS3ObjectMetadata } from './s3.js';
 
 const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
 const TRAILER_READ_SIZE = 8192; // 8KB
 const MAX_PAGE_COUNT = 100000;
 
-async function extractPageCountFromTrailer(filePath: string, fileSize: number): Promise<number | null> {
+async function extractPageCountFromTrailer(key: string, fileSize: number): Promise<number | null> {
   try {
     const readSize = Math.min(TRAILER_READ_SIZE, fileSize);
-    const buffer = Buffer.alloc(readSize);
-    
-    const fileHandle = await fs.open(filePath, 'r');
-    await fileHandle.read(buffer, 0, readSize, fileSize - readSize);
-    await fileHandle.close();
+    const start = fileSize - readSize;
+    const buffer = await getS3ObjectBuffer(key, { start, end: fileSize - 1 });
     
     const content = buffer.toString('latin1');
     const pagesMatch = content.match(/\/Type\s*\/Pages/);
@@ -34,8 +30,8 @@ async function extractPageCountFromTrailer(filePath: string, fileSize: number): 
   }
 }
 
-async function parseFullPdf(filePath: string): Promise<number> {
-  const buffer = await fs.readFile(filePath);
+async function parseFullPdf(key: string): Promise<number> {
+  const buffer = await getS3ObjectBuffer(key);
   const uint8Array = new Uint8Array(buffer);
   
   const loadingTask = pdfjs.getDocument({
@@ -47,22 +43,21 @@ async function parseFullPdf(filePath: string): Promise<number> {
   return pdf.numPages;
 }
 
-export async function getPdfPageCount(filePath: string): Promise<number> {
+export async function getPdfPageCount(key: string): Promise<number> {
   try {
-    const stats = await fs.stat(filePath);
+    const metadata = await getS3ObjectMetadata(key);
     
-    if (stats.size > LARGE_FILE_THRESHOLD) {
-      const pageCount = await extractPageCountFromTrailer(filePath, stats.size);
+    if (metadata.size > LARGE_FILE_THRESHOLD) {
+      const pageCount = await extractPageCountFromTrailer(key, metadata.size);
       if (pageCount !== null) {
         return pageCount;
       }
     }
     
-    return await parseFullPdf(filePath);
+    return await parseFullPdf(key);
     
   } catch (error) {
-    const filename = path.basename(filePath);
-    console.error(`PDF parsing failed for ${filename}:`, error);
-    throw new Error(`Unable to extract page count from PDF: ${filename}`);
+    console.error(`PDF parsing failed for ${key}:`, error);
+    throw new Error(`Unable to extract page count from PDF: ${key}`);
   }
 }
