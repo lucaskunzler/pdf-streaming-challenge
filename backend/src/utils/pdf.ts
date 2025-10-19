@@ -1,15 +1,15 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { getS3ObjectBuffer, getS3ObjectMetadata } from './s3.js';
+import { IStorage } from './storage.types.js';
 
 const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
 const TRAILER_READ_SIZE = 8192; // 8KB
 const MAX_PAGE_COUNT = 100000;
 
-async function extractPageCountFromTrailer(key: string, fileSize: number): Promise<number | null> {
+async function extractPageCountFromTrailer(key: string, fileSize: number, storage: IStorage): Promise<number | null> {
   try {
     const readSize = Math.min(TRAILER_READ_SIZE, fileSize);
     const start = fileSize - readSize;
-    const buffer = await getS3ObjectBuffer(key, { start, end: fileSize - 1 });
+    const buffer = await storage.getBuffer(key, { start, end: fileSize - 1 });
     
     const content = buffer.toString('latin1');
     const pagesMatch = content.match(/\/Type\s*\/Pages/);
@@ -30,8 +30,8 @@ async function extractPageCountFromTrailer(key: string, fileSize: number): Promi
   }
 }
 
-async function parseFullPdf(key: string): Promise<number> {
-  const buffer = await getS3ObjectBuffer(key);
+async function parseFullPdf(key: string, storage: IStorage): Promise<number> {
+  const buffer = await storage.getBuffer(key);
   const uint8Array = new Uint8Array(buffer);
   
   const loadingTask = pdfjs.getDocument({
@@ -43,18 +43,18 @@ async function parseFullPdf(key: string): Promise<number> {
   return pdf.numPages;
 }
 
-export async function getPdfPageCount(key: string): Promise<number> {
+export async function getPdfPageCount(key: string, storage: IStorage): Promise<number> {
   try {
-    const metadata = await getS3ObjectMetadata(key);
+    const metadata = await storage.getMetadata(key);
     
     if (metadata.size > LARGE_FILE_THRESHOLD) {
-      const pageCount = await extractPageCountFromTrailer(key, metadata.size);
+      const pageCount = await extractPageCountFromTrailer(key, metadata.size, storage);
       if (pageCount !== null) {
         return pageCount;
       }
     }
     
-    return await parseFullPdf(key);
+    return await parseFullPdf(key, storage);
     
   } catch (error) {
     console.error(`PDF parsing failed for ${key}:`, error);

@@ -10,6 +10,7 @@ describe('Document Metadata API', () => {
     // Configure app to use test fixtures directory and disable logging
     const testFixturesPath = path.join(__dirname, '../fixtures');
     app = createApp({ 
+      storageType: 'local',
       documentsPath: testFixturesPath,
       logger: false 
     });

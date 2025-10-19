@@ -2,11 +2,16 @@ import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { parseRange } from './utils/range.js';
 import { getPdfPageCount } from './utils/pdf.js';
-import { generateETag, validateDocument, createErrorResponse } from './utils/document.js';
-import { getS3ObjectStream } from './utils/s3.js';
+import { validateDocument, createErrorResponse } from './utils/document.js';
+import { createStorage, StorageConfig } from './utils/storage.factory.js';
+import { IStorage } from './utils/storage.types.js';
 
 interface AppConfig {
   logger?: boolean | object;
+  storageType?: 'local' | 's3';
+  documentsPath?: string;
+  s3Bucket?: string;
+  s3Region?: string;
 }
 
 export function createApp(config: AppConfig = {}): FastifyInstance {
@@ -27,6 +32,17 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     logger: config.logger !== undefined ? config.logger : defaultLogger
   });
   
+  // Initialize storage based on config or environment
+  const storageConfig: StorageConfig = config.storageType === 'local'
+    ? { type: 'local', basePath: config.documentsPath || './documents' }
+    : {
+        type: 's3',
+        bucket: config.s3Bucket || process.env.AWS_S3_BUCKET || '',
+        region: config.s3Region || process.env.AWS_REGION || 'us-east-1'
+      };
+  
+  const storage: IStorage = createStorage(storageConfig);
+  
   app.register(cors, {
     origin: true,
     exposedHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length', 'Content-Encoding']
@@ -43,9 +59,9 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     const { id } = request.params as { id: string };
     
     try {
-      const metadata = await validateDocument(id);
-      const pageCount = await getPdfPageCount(id);
-      const etag = generateETag(metadata);
+      const metadata = await validateDocument(id, storage);
+      const pageCount = await getPdfPageCount(id, storage);
+      const etag = metadata.etag;
       
       const ifNoneMatch = request.headers['if-none-match'];
       if (ifNoneMatch === etag) {
@@ -76,8 +92,8 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     const { id } = request.params as { id: string };
     
     try {
-      const metadata = await validateDocument(id);
-      const etag = generateETag(metadata);
+      const metadata = await validateDocument(id, storage);
+      const etag = metadata.etag;
       
       return reply
         .status(200)
@@ -99,11 +115,11 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     const rangeHeader = request.headers['range'] as string;
     
     try {
-      const metadata = await validateDocument(id);
-      const etag = generateETag(metadata);
+      const metadata = await validateDocument(id, storage);
+      const etag = metadata.etag;
       
       if (!rangeHeader) {
-        const stream = await getS3ObjectStream(id);
+        const stream = await storage.getStream(id);
         
         return reply
           .status(200)
@@ -138,7 +154,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       }
 
       const contentLength = range.end - range.start + 1;
-      const stream = await getS3ObjectStream(id, range);
+      const stream = await storage.getStream(id, range);
 
       reply.status(206)
         .header('content-type', 'application/pdf')

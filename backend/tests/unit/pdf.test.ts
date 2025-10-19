@@ -1,33 +1,32 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 import { getPdfPageCount } from '../../src/utils/pdf';
+import { LocalStorage } from '../../src/utils/storage.local';
 
 const FIXTURES_PATH = path.join(__dirname, '../fixtures');
 
 describe('PDF Utils', () => {
   describe('getPdfPageCount', () => {
+    const storage = new LocalStorage(FIXTURES_PATH);
+
     it('should extract page count from tiny PDF (< 5MB)', async () => {
-      const filePath = path.join(FIXTURES_PATH, 'tiny-1p.pdf');
-      const pageCount = await getPdfPageCount(filePath);
+      const pageCount = await getPdfPageCount('tiny-1p.pdf', storage);
       expect(pageCount).toBe(1);
     });
 
     it('should extract page count from small PDF (< 5MB)', async () => {
-      const filePath = path.join(FIXTURES_PATH, 'small-2p.pdf');
-      const pageCount = await getPdfPageCount(filePath);
+      const pageCount = await getPdfPageCount('small-2p.pdf', storage);
       expect(pageCount).toBe(2);
     });
 
     it('should extract page count from multi-page PDF (< 5MB)', async () => {
-      const filePath = path.join(FIXTURES_PATH, 'text-and-images.pdf');
-      const pageCount = await getPdfPageCount(filePath);
+      const pageCount = await getPdfPageCount('text-and-images.pdf', storage);
       expect(pageCount).toBe(9);
     });
 
     it('should efficiently extract page count from large PDF (> 5MB) using trailer optimization', async () => {
-      const filePath = path.join(FIXTURES_PATH, 'large-361p-12mb.pdf');
       const startTime = Date.now();
-      const pageCount = await getPdfPageCount(filePath);
+      const pageCount = await getPdfPageCount('large-361p-12mb.pdf', storage);
       const duration = Date.now() - startTime;
       
       expect(pageCount).toBe(361);
@@ -36,14 +35,12 @@ describe('PDF Utils', () => {
     });
 
     it('should handle PDF with images correctly', async () => {
-      const filePath = path.join(FIXTURES_PATH, 'small-images.pdf');
-      const pageCount = await getPdfPageCount(filePath);
+      const pageCount = await getPdfPageCount('small-images.pdf', storage);
       expect(pageCount).toBeGreaterThan(0);
     });
 
     it('should throw error for non-existent file', async () => {
-      const filePath = path.join(FIXTURES_PATH, 'non-existent.pdf');
-      await expect(getPdfPageCount(filePath)).rejects.toThrow();
+      await expect(getPdfPageCount('non-existent.pdf', storage)).rejects.toThrow();
     });
   });
 });
