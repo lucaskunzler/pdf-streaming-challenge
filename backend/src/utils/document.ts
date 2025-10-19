@@ -6,10 +6,6 @@ export interface DocumentMetadata {
   etag: string;
 }
 
-export function generateETag(metadata: DocumentMetadata): string {
-  return metadata.etag;
-}
-
 export async function validateDocument(key: string, storage: IStorage): Promise<DocumentMetadata> {
   const metadata = await storage.getMetadata(key);
   return {
@@ -20,7 +16,7 @@ export async function validateDocument(key: string, storage: IStorage): Promise<
 }
 
 export function createErrorResponse(error: unknown, context: 'metadata' | 'range'): { status: number; body: object } {
-  const isFileError = (error as NodeJS.ErrnoException).code === 'ENOENT';
+  const isFileError = error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT';
   const status = isFileError ? 404 : 500;
   const errorMessage = isFileError 
     ? 'Document not found' 

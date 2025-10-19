@@ -2,7 +2,7 @@ import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { parseRange } from './utils/range.js';
 import { getPdfPageCount } from './utils/pdf.js';
-import { generateETag, validateDocument, createErrorResponse } from './utils/document.js';
+import { validateDocument, createErrorResponse } from './utils/document.js';
 import { createStorage, StorageConfig } from './utils/storage.factory.js';
 import { IStorage } from './utils/storage.types.js';
 
@@ -61,7 +61,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     try {
       const metadata = await validateDocument(id, storage);
       const pageCount = await getPdfPageCount(id, storage);
-      const etag = generateETag(metadata);
+      const etag = metadata.etag;
       
       const ifNoneMatch = request.headers['if-none-match'];
       if (ifNoneMatch === etag) {
@@ -93,7 +93,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     
     try {
       const metadata = await validateDocument(id, storage);
-      const etag = generateETag(metadata);
+      const etag = metadata.etag;
       
       return reply
         .status(200)
@@ -116,7 +116,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     
     try {
       const metadata = await validateDocument(id, storage);
-      const etag = generateETag(metadata);
+      const etag = metadata.etag;
       
       if (!rangeHeader) {
         const stream = await storage.getStream(id);

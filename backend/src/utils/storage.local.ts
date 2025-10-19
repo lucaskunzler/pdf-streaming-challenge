@@ -1,4 +1,4 @@
-import { createReadStream, createReadStream as fsCreateReadStream } from 'fs';
+import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { createHash } from 'crypto';
 import { Readable } from 'stream';
