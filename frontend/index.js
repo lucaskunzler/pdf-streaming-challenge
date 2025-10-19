@@ -1,8 +1,15 @@
 // Configuration for backend API
 const BACKEND_URL = "http://localhost:3000";
-const DOCUMENT_ID = "large-361p-12mb.pdf"; // Change this to load different documents
+const DOCUMENT_ID = "large-361p-12mb.pdf";
 
-// Import PDF.js from CDN (v5.4.296 - latest as of Oct 2025)
+// Change DOCUMENT_ID to load different documents
+// small-2p.pdf
+// text-and-images.pdf
+// large-361p-12mb.pdf
+// large-361p-12mb-linearized.pdf
+
+
+
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.min.mjs';
 
 // Set worker source to CDN
@@ -58,7 +65,8 @@ pdfjsLib
     url: pdfUrl,
     rangeChunkSize: 65536, // 64KB chunks - optimizes range requests
     disableAutoFetch: true, // Only fetch data when needed
-    disableStream: false,   // Enable streaming
+    disableStream: true,    // Disable full-file streaming, use range requests only
+    disableRange: false,    // Explicitly enable range requests (default, but being explicit)
   })
   .promise.then((data) => {
     initialState.pdfDoc = data;
