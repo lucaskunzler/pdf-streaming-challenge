@@ -25,6 +25,21 @@ const previousPage = document.querySelector("#prev_page");
 const nextPage = document.querySelector("#next_page");
 const zoomIn = document.querySelector("#zoom_in");
 const zoomOut = document.querySelector("#zoom_out");
+const docFilename = document.querySelector("#doc_filename");
+const docSize = document.querySelector("#doc_size");
+
+// Fetch document metadata
+fetch(`${BACKEND_URL}/api/documents/${DOCUMENT_ID}/metadata`)
+  .then(res => res.json())
+  .then(metadata => {
+    const sizeMB = (metadata.fileSize / 1024 / 1024).toFixed(2);
+    docFilename.textContent = metadata.filename;
+    docSize.textContent = `${sizeMB} MB`;
+  })
+  .catch(err => {
+    console.error('Error loading metadata:', err);
+    docFilename.textContent = DOCUMENT_ID;
+  });
 
 const initialState = {
   pdfDoc: null,

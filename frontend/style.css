@@ -23,6 +23,22 @@ a:hover,
   cursor: pointer;
 }
 
+.doc-info {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.doc-info #doc_filename {
+  font-weight: 500;
+}
+
+.doc-info #doc_size {
+  color: #555;
+  font-size: 0.8rem;
+}
+
 .navigation {
   background-color: #bbb;
   color: #000;
