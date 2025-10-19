@@ -26,7 +26,7 @@ Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second f
 
 ```
 ┌─────────────────┐    HTTP Range    ┌──────────────────┐    File I/O    ┌─────────────┐
-│  React + PDF.js │ ◄──────────────► │   Fastify API    │ ◄────────────► │ S3 / Local  │
+│  JS + PDF.js    │ ◄──────────────► │   Fastify API    │ ◄────────────► │ S3 / Local  │
 │   (Browser)     │    Requests      │   (Range Proxy)  │                │     FS      │
 └─────────────────┘                  └──────────────────┘                └─────────────┘
 ```
@@ -35,7 +35,7 @@ Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second f
 
 ## 3. Tech Stack
 
-**Frontend**: React + TypeScript + Vite  
+**Frontend**: Vanilla JavaScript + PDF.js
 **Backend**: Node.js + TypeScript + Fastify  
 **Infra**: Docker + Docker Compose
 
@@ -51,10 +51,10 @@ Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second f
 - 206/416 status codes for partial content
 
 ### Frontend
-- PDF.js with range request support
-- React Query for server state
-- Components: PDFViewer, DocumentSelector, PDFSidebar
-- Custom hook: useDocumentMetadata
+- PDF.js (v5.4.149) with range request support
+- Vanilla JavaScript with native Fetch API
+- Canvas-based rendering with zoom controls
+- Page navigation and document metadata display
 
 ---
 
