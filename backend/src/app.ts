@@ -1,19 +1,30 @@
 import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import path from 'path';
 import { parseRange } from './utils/range.js';
 import { getPdfPageCount } from './utils/pdf.js';
 import { generateETag, validateDocument, createErrorResponse } from './utils/document.js';
-
+import { getS3ObjectStream } from './utils/s3.js';
 
 interface AppConfig {
-  documentsPath?: string;
-  logger?: boolean;
+  logger?: boolean | object;
 }
 
 export function createApp(config: AppConfig = {}): FastifyInstance {
+  const usePrettyLogs = process.env.NODE_ENV !== 'production';
+  const defaultLogger = usePrettyLogs ? {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss Z',
+        ignore: 'pid,hostname,reqId',
+        colorize: false,
+        singleLine: true
+      }
+    }
+  } : true;
+  
   const app = fastify({ 
-    logger: config.logger !== undefined ? config.logger : true 
+    logger: config.logger !== undefined ? config.logger : defaultLogger
   });
   
   app.register(cors, {
@@ -21,7 +32,6 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     exposedHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length', 'Content-Encoding']
   });
   
-  const documentsPath = config.documentsPath || process.env.DOCUMENTS_PATH || path.join(process.cwd(), 'documents');
   app.get('/health', async () => {
     return {
       status: 'ok',
@@ -31,12 +41,11 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
 
   app.get('/api/documents/:id/metadata', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const documentPath = path.join(documentsPath, id);
     
     try {
-      const stats = await validateDocument(documentPath);
-      const pageCount = await getPdfPageCount(documentPath);
-      const etag = generateETag(stats);
+      const metadata = await validateDocument(id);
+      const pageCount = await getPdfPageCount(id);
+      const etag = generateETag(metadata);
       
       const ifNoneMatch = request.headers['if-none-match'];
       if (ifNoneMatch === etag) {
@@ -49,10 +58,10 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       
       return {
         id,
-        filename: path.basename(documentPath),
+        filename: id,
         pageCount,
-        fileSize: stats.size,
-        lastModified: stats.mtime.toISOString(),
+        fileSize: metadata.size,
+        lastModified: metadata.mtime.toISOString(),
         etag
       };
       
@@ -65,19 +74,18 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
   // Handle HEAD requests for getting file info without downloading
   app.head('/api/documents/:id/range', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const documentPath = path.join(documentsPath, id);
     
     try {
-      const stats = await validateDocument(documentPath);
-      const etag = generateETag(stats);
+      const metadata = await validateDocument(id);
+      const etag = generateETag(metadata);
       
       return reply
         .status(200)
         .header('content-type', 'application/pdf')
         .header('accept-ranges', 'bytes')
-        .header('content-length', stats.size.toString())
+        .header('content-length', metadata.size.toString())
         .header('etag', etag)
-        .header('last-modified', stats.mtime.toUTCString())
+        .header('last-modified', metadata.mtime.toUTCString())
         .header('cache-control', 'public, max-age=3600')
         .send();
     } catch (error) {
@@ -89,33 +97,31 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
   app.get('/api/documents/:id/range', async (request, reply) => {
     const { id } = request.params as { id: string };
     const rangeHeader = request.headers['range'] as string;
-    const documentPath = path.join(documentsPath, id);
     
     try {
-      const stats = await validateDocument(documentPath);
-      const etag = generateETag(stats);
+      const metadata = await validateDocument(id);
+      const etag = generateETag(metadata);
       
       if (!rangeHeader) {
-        // Stream the file without loading it entirely into memory
-        const stream = (await import('fs')).createReadStream(documentPath);
+        const stream = await getS3ObjectStream(id);
         
         return reply
           .status(200)
           .header('content-type', 'application/pdf')
           .header('accept-ranges', 'bytes')
-          .header('content-length', stats.size.toString())
+          .header('content-length', metadata.size.toString())
           .header('etag', etag)
-          .header('last-modified', stats.mtime.toUTCString())
+          .header('last-modified', metadata.mtime.toUTCString())
           .header('cache-control', 'public, max-age=3600')
           .send(stream);
       }
       
       // Handle Range request
-      const range = parseRange(rangeHeader, stats.size);
+      const range = parseRange(rangeHeader, metadata.size);
       
-      if (!range || range.start >= stats.size || range.end >= stats.size) {
+      if (!range || range.start >= metadata.size || range.end >= metadata.size) {
         return reply.status(416)
-          .header('content-range', `bytes */${stats.size}`)
+          .header('content-range', `bytes */${metadata.size}`)
           .send({
             error: 'Range not satisfiable',
             statusCode: 416
@@ -132,20 +138,15 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       }
 
       const contentLength = range.end - range.start + 1;
-      
-      // Stream the range without loading it entirely into memory
-      const stream = (await import('fs')).createReadStream(documentPath, {
-        start: range.start,
-        end: range.end
-      });
+      const stream = await getS3ObjectStream(id, range);
 
       reply.status(206)
         .header('content-type', 'application/pdf')
         .header('accept-ranges', 'bytes')
-        .header('content-range', `bytes ${range.start}-${range.end}/${stats.size}`)
+        .header('content-range', `bytes ${range.start}-${range.end}/${metadata.size}`)
         .header('content-length', contentLength.toString())
         .header('etag', etag)
-        .header('last-modified', stats.mtime.toUTCString())
+        .header('last-modified', metadata.mtime.toUTCString())
         .header('cache-control', 'public, max-age=3600');
 
       return reply.send(stream);

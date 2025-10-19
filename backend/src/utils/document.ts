@@ -1,21 +1,31 @@
-import fs from 'fs/promises';
-import { Stats } from 'fs';
-import crypto from 'crypto';
+import { getS3ObjectMetadata } from './s3.js';
 
-export function generateETag(stats: Stats): string {
-  return `"${crypto.createHash('md5').update(`${stats.size}-${stats.mtime.getTime()}`).digest('hex')}"`;
+export interface DocumentMetadata {
+  size: number;
+  mtime: Date;
+  etag: string;
 }
 
-export async function validateDocument(documentPath: string): Promise<Stats> {
-  const stats = await fs.stat(documentPath);
-  
-  if (!stats.isFile()) {
-    const error = new Error('Document not found') as NodeJS.ErrnoException;
-    error.code = 'ENOENT';
+export function generateETag(metadata: DocumentMetadata): string {
+  return metadata.etag;
+}
+
+export async function validateDocument(key: string): Promise<DocumentMetadata> {
+  try {
+    const metadata = await getS3ObjectMetadata(key);
+    return {
+      size: metadata.size,
+      mtime: metadata.lastModified,
+      etag: metadata.etag
+    };
+  } catch (error: any) {
+    if (error.name === 'NoSuchKey' || error.name === 'NotFound') {
+      const err = new Error('Document not found') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    }
     throw error;
   }
-  
-  return stats;
 }
 
 export function createErrorResponse(error: unknown, context: 'metadata' | 'range'): { status: number; body: object } {

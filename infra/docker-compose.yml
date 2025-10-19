@@ -5,10 +5,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - DOCUMENTS_PATH=/app/documents
-    volumes:
-      - ../backend/documents:/app/documents:ro
+      - NODE_ENV=development
+      - AWS_REGION=${S3_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${S3_BUCKET}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
@@ -40,8 +41,3 @@ services:
 networks:
   pdf-streaming-network:
     driver: bridge
-
-volumes:
-  backend-documents:
-    driver: local
-
