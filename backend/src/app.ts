@@ -5,6 +5,7 @@ import { getPdfPageCount } from './utils/pdf.js';
 import { validateDocument, createErrorResponse } from './utils/document.js';
 import { createStorage, StorageConfig } from './utils/storage.factory.js';
 import { IStorage } from './utils/storage.types.js';
+import { createLoggerConfig, setupRequestLogging } from './utils/logger.config.js';
 
 interface AppConfig {
   logger?: boolean | object;
@@ -16,20 +17,11 @@ interface AppConfig {
 
 export function createApp(config: AppConfig = {}): FastifyInstance {
   const usePrettyLogs = process.env.NODE_ENV !== 'production';
-  const defaultLogger = usePrettyLogs ? {
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname,reqId',
-        colorize: false,
-        singleLine: true
-      }
-    }
-  } : true;
+  const defaultLogger = createLoggerConfig(usePrettyLogs);
   
   const app = fastify({ 
-    logger: config.logger !== undefined ? config.logger : defaultLogger
+    logger: config.logger !== undefined ? config.logger : defaultLogger,
+    disableRequestLogging: usePrettyLogs
   });
   
   // Initialize storage based on config or environment
@@ -47,6 +39,11 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     origin: true,
     exposedHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length', 'Content-Encoding']
   });
+  
+  // Setup custom request logging
+  if (usePrettyLogs) {
+    setupRequestLogging(app);
+  }
   
   app.get('/health', async () => {
     return {
