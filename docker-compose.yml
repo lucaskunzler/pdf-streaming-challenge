@@ -1,6 +1,6 @@
 services:
   backend:
-    build: ../backend
+    build: ./backend
     container_name: pdf-streaming-backend
     ports:
       - "3000:3000"
@@ -22,7 +22,7 @@ services:
       - pdf-streaming-network
 
   frontend:
-    build: ../frontend
+    build: ./frontend
     container_name: pdf-streaming-frontend
     ports:
       - "8080:80"
