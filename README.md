@@ -14,12 +14,12 @@ docker-compose up --build
 ## Documentation
 
 - [Feature Brief](./docs/feature-brief.md)
-- [Architecture Overview](./docs/architecture.md)  - TBI
+- [Architecture Overview](./docs/architecture.md)
 - [Backend Readme](./backend/README.md)
 
 ## Tech Stack
 
 - **Backend**: Fastify + TypeScript + pdf-parse
-- **Frontend**: React + Vite + shadcn/ui + react-pdf
+- **Frontend**: Vanilla JS + PDF.js
 - **Infrastructure**: Docker + Docker Compose
 

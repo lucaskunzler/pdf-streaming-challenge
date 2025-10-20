@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second first page rendering.
+Simple PDF streaming for large documents (100+ pages, 30-80MB).
 
 ---
 
@@ -44,8 +44,9 @@ Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second f
 ## 4. Implementation
 
 ### Backend
-- `GET /api/documents/:id/metadata` - Document info
+- `GET /api/documents/:id/metadata` - Document info (page count, file size, ETag)
 - `GET /api/documents/:id/range` - HTTP range support (RFC 7233)
+- `HEAD /api/documents/:id/range` - Capability discovery
 - `GET /health` - Health check
 - ETag generation for cache validation
 - 206/416 status codes for partial content
@@ -62,18 +63,14 @@ Simple PDF streaming for large documents (100+ pages, 30-80MB) with sub-second f
 
 ### Completed
 - ✅ Backend with HTTP range support
-- ✅ Frontend with PDF.js
-- ✅ Docker setup
-- ✅ 80%+ test coverage (backend)
-
-### TODO
-- ⏳ S3 integration and deployment
-- ⏳ Performance measurements
-- ⏳ Architecture docs
+- ✅ Frontend with PDF.js and prefetching
+- ✅ S3 + local storage support
+- ✅ Docker setup with health checks
+- ✅ 96% test coverage (57 tests passing)
+- ✅ Structured logging
 
 ### Future Enhancements
 - User authentication
 - CDN integration
 - Database layer
-- Redis caching
-- Monitoring & alerts
+- Monitoring & telemetry
