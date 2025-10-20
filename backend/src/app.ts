@@ -1,11 +1,19 @@
 import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import { parseRange } from './utils/range.js';
 import { getPdfPageCount } from './utils/pdf.js';
 import { validateDocument, createErrorResponse } from './utils/document.js';
 import { createStorage, StorageConfig } from './utils/storage.factory.js';
 import { IStorage } from './utils/storage.types.js';
 import { createLoggerConfig, setupRequestLogging } from './utils/logger.config.js';
+import { 
+  healthSchema, 
+  documentMetadataSchema, 
+  documentHeadSchema, 
+  documentRangeSchema 
+} from './schemas/api.schemas.js';
 
 interface AppConfig {
   logger?: boolean | object;
@@ -41,19 +49,56 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     exposedHeaders: ['Accept-Ranges', 'Content-Range', 'Content-Length', 'Content-Encoding']
   });
   
+  // Register Swagger for API documentation
+  app.register(swagger, {
+    openapi: {
+      openapi: '3.0.0',
+      info: {
+        title: 'PDF Streaming API',
+        description: 'API for streaming PDF documents with HTTP range request support. Enables efficient partial content delivery for large PDF files.',
+        version: '1.0.0'
+      },
+      servers: [
+        {
+          url: 'http://localhost:3000',
+          description: 'Development server'
+        }
+      ],
+      tags: [
+        { name: 'health', description: 'Health check endpoints' },
+        { name: 'documents', description: 'PDF document operations' }
+      ]
+    }
+  });
+  
+  app.register(swaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: true
+    },
+    staticCSP: true
+  });
+  
   // Setup custom request logging
   if (usePrettyLogs) {
     setupRequestLogging(app);
   }
   
-  app.get('/health', async () => {
+  // Register routes
+  app.register(async function routes(app) {
+  app.get('/health', {
+    schema: healthSchema
+  }, async () => {
     return {
       status: 'ok',
       timestamp: new Date().toISOString()
     };
   });
 
-  app.get('/api/documents/:id/metadata', async (request, reply) => {
+  app.get('/api/documents/:id/metadata', {
+    schema: documentMetadataSchema
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     
     try {
@@ -81,12 +126,14 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       
     } catch (error) {
       const { status, body } = createErrorResponse(error, 'metadata');
-      return reply.status(status).send(body);
+      return reply.status(status as 404 | 500).send(body);
     }
   });
 
   // Handle HEAD requests for getting file info without downloading
-  app.head('/api/documents/:id/range', async (request, reply) => {
+  app.head('/api/documents/:id/range', {
+    schema: documentHeadSchema
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     
     try {
@@ -104,11 +151,13 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
         .send();
     } catch (error) {
       const { status, body } = createErrorResponse(error, 'range');
-      return reply.status(status).send(body);
+      return reply.status(status as 404).send(body);
     }
   });
 
-  app.get('/api/documents/:id/range', async (request, reply) => {
+  app.get('/api/documents/:id/range', {
+    schema: documentRangeSchema
+  }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const rangeHeader = request.headers['range'] as string;
     
@@ -167,9 +216,10 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       
     } catch (error) {
       const { status, body } = createErrorResponse(error, 'range');
-      return reply.status(status).send(body);
+      return reply.status(status as 404 | 500).send(body);
     }
   });
+  }); // End routes plugin
 
   return app;
 }
@@ -180,8 +230,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   
   const start = async () => {
     try {
+      await app.ready();
       await app.listen({ port: 3000, host: '0.0.0.0' });
       console.log('Server running on http://localhost:3000');
+      console.log('Swagger documentation available at http://localhost:3000/docs');
     } catch (err) {
       app.log.error(err);
       process.exit(1);
