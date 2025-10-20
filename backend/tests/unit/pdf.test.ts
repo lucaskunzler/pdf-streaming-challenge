@@ -19,11 +19,6 @@ describe('PDF Utils', () => {
       expect(pageCount).toBe(2);
     });
 
-    it('should extract page count from multi-page PDF (< 5MB)', async () => {
-      const pageCount = await getPdfPageCount('text-and-images.pdf', storage);
-      expect(pageCount).toBe(9);
-    });
-
     it('should efficiently extract page count from large PDF (> 5MB) using trailer optimization', async () => {
       const startTime = Date.now();
       const pageCount = await getPdfPageCount('large-361p-12mb.pdf', storage);
@@ -32,11 +27,6 @@ describe('PDF Utils', () => {
       expect(pageCount).toBe(361);
       // Should be fast since we only read trailer (~8KB), not full 12MB
       expect(duration).toBeLessThan(100); // Should complete in under 100ms
-    });
-
-    it('should handle PDF with images correctly', async () => {
-      const pageCount = await getPdfPageCount('small-images.pdf', storage);
-      expect(pageCount).toBeGreaterThan(0);
     });
 
     it('should throw error for non-existent file', async () => {

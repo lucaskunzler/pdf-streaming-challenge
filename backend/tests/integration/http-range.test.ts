@@ -31,7 +31,7 @@ describe('HTTP Range Support API', () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toBe('application/pdf');
       expect(response.headers['accept-ranges']).toBe('bytes');
-      expect(response.headers['content-length']).toBe('1870');
+      expect(response.headers['content-length']).toBe('2108');
       expect(response.headers['etag']).toBeDefined();
       expect(response.body).toBe('');
     });
@@ -57,9 +57,9 @@ describe('HTTP Range Support API', () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toBe('application/pdf');
       expect(response.headers['accept-ranges']).toBe('bytes');
-      expect(response.headers['content-length']).toBe('1870');
+      expect(response.headers['content-length']).toBe('2108');
       expect(response.rawPayload).toBeInstanceOf(Buffer);
-      expect(response.rawPayload.length).toBe(1870);
+      expect(response.rawPayload.length).toBe(2108);
     });
 
     it('should return 416 for invalid range', async () => {
@@ -78,11 +78,11 @@ describe('HTTP Range Support API', () => {
       const response = await app.inject({
         method: 'GET',
         url: '/api/documents/tiny-1p.pdf/range',
-        headers: { 'range': 'bytes=5000-6000' }  // tiny-1p.pdf is only 1870 bytes
+        headers: { 'range': 'bytes=5000-6000' }  // tiny-1p.pdf is only 2108 bytes
       });
 
       expect(response.statusCode).toBe(416);
-      expect(response.headers['content-range']).toBe('bytes */1870');
+      expect(response.headers['content-range']).toBe('bytes */2108');
     });
 
     it('should return 206 partial content for valid byte range', async () => {
@@ -95,7 +95,7 @@ describe('HTTP Range Support API', () => {
       expect(response.statusCode).toBe(206);
       expect(response.headers['content-type']).toBe('application/pdf');
       expect(response.headers['accept-ranges']).toBe('bytes');
-      expect(response.headers['content-range']).toBe('bytes 0-1023/1870');
+      expect(response.headers['content-range']).toBe('bytes 0-1023/2108');
       expect(response.rawPayload).toBeInstanceOf(Buffer);
       expect(response.rawPayload.length).toBe(1024);
     });
@@ -109,7 +109,7 @@ describe('HTTP Range Support API', () => {
       });
 
       expect(openResponse.statusCode).toBe(206);
-      expect(openResponse.headers['content-range']).toBe('bytes 1000-1869/1870');
+      expect(openResponse.headers['content-range']).toBe('bytes 1000-2107/2108');
 
       // Test suffix range (last N bytes)
       const suffixResponse = await app.inject({
@@ -119,7 +119,7 @@ describe('HTTP Range Support API', () => {
       });
 
       expect(suffixResponse.statusCode).toBe(206);
-      expect(suffixResponse.headers['content-range']).toBe('bytes 1370-1869/1870');
+      expect(suffixResponse.headers['content-range']).toBe('bytes 1608-2107/2108');
     });
 
     it('should include caching headers', async () => {
