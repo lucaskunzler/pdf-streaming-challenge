@@ -6,10 +6,11 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - AWS_REGION=${S3_REGION}
+      - STORAGE_TYPE=s3
+      - AWS_REGION=${AWS_REGION}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_S3_BUCKET=${S3_BUCKET}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]

@@ -25,7 +25,8 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
   });
   
   // Initialize storage based on config or environment
-  const storageConfig: StorageConfig = config.storageType === 'local'
+  const storageType = config.storageType || (process.env.STORAGE_TYPE as 'local' | 's3') || 'local';
+  const storageConfig: StorageConfig = storageType === 'local'
     ? { type: 'local', basePath: config.documentsPath || './documents' }
     : {
         type: 's3',

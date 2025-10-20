@@ -30,6 +30,28 @@ a:hover,
   font-size: 0.85rem;
 }
 
+.doc-selector {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.doc-selector:hover {
+  border-color: #0075f2;
+  background-color: #f8f9fa;
+}
+
+.doc-selector:focus {
+  outline: none;
+  border-color: #0075f2;
+  box-shadow: 0 0 0 2px rgba(0, 117, 242, 0.1);
+}
+
 .doc-info #doc_filename {
   font-weight: 500;
 }

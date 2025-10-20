@@ -49,8 +49,9 @@ RUN npm ci --only=production && \
 # Copy built files from builder
 COPY --from=builder /build/dist ./dist
 
-# Create documents directory
+# Create documents directory and copy PDF files
 RUN mkdir -p /app/documents
+COPY documents/*.pdf /app/documents/
 
 # Set non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
