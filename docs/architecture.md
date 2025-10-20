@@ -1,110 +1,95 @@
-# System Architecture
+# Backend Architecture
 
 ## Overview
 
-PDF streaming system using HTTP range requests to efficiently serve large documents without loading entire files into memory.
+Node.js backend service that streams PDF documents using HTTP range requests. Serves byte-range chunks on demand without loading entire files into memory.
 
-## Components
+## Core Components
 
-### Frontend (Port 8080)
-- **Stack**: Vanilla JavaScript + PDF.js + Nginx
-- **Responsibilities**: PDF rendering, page navigation, range request handling
-- **Optimization**: Prefetches adjacent pages (next, prev, next+2) for faster navigation
-
-### Backend (Port 3000)
+### API Layer
 - **Stack**: Node.js + TypeScript + Fastify
-- **Responsibilities**: HTTP range proxy, PDF metadata extraction, storage abstraction
 - **Endpoints**:
-  - `GET /api/documents/:id/metadata` - Page count, file size, ETag
-  - `GET /api/documents/:id/range` - Byte range requests (206 responses)
-  - `HEAD /api/documents/:id/range` - Capability discovery
+  - `GET /api/documents/:id/metadata` - Returns page count, file size, ETag
+  - `GET /api/documents/:id/range` - Handles byte range requests (HTTP 206)
+  - `HEAD /api/documents/:id/range` - Range capability discovery
   - `GET /health` - Health check
 
 ### Storage Layer
-- **Abstraction**: Unified interface supporting multiple backends
-- **Local**: File system access for development
-- **S3**: AWS S3 integration for production
+- **Local Storage**: File system access (development)
+- **S3 Storage**: AWS S3 integration (production)
+
 
 ## Request Flow
 
 ```
-Browser → Backend API → Storage (S3/Local FS)
-  ↓          ↓              ↓
-Range      Parse          Read
-Request    Range          Bytes
-  ↓          ↓              ↓
-Render ← 206 Response ← Stream Data
-Page       (partial)
+┌─────────┐           ┌─────────┐           ┌─────────┐
+│ Browser │           │ Backend │           │ Storage │
+└────┬────┘           └────┬────┘           └────┬────┘
+     │                     │                     │
+     │  Range Request      │                     │
+     │ ─────────────────>  │                     │
+     │                     │                     │
+     │                     │  Parse Range        │
+     │                     │  Get Bytes          │
+     │                     │ ─────────────────>  │
+     │                     │                     │
+     │                     │  Stream Data        │
+     │                     │ <─────────────────  │
+     │                     │                     │
+     │  206 Partial        │                     │
+     │  Content-Range      │                     │
+     │ <─────────────────  │                     │
+     │                     │                     │
 ```
 
 ## Key Design Decisions
 
-**Range Requests (RFC 7233)**
-- Enables streaming without full file download
-- Backend reads only requested byte ranges from storage
-- Returns 206 (Partial Content) with Content-Range headers
+**HTTP Range Requests (RFC 7233)**
+- Reads only requested byte ranges from storage
+- Returns 206 (Partial Content) with proper Content-Range headers
 
-**Storage Abstraction**
-- Factory pattern for pluggable storage backends
-- Consistent interface for local and S3 storage
-- Easy to add new storage providers
 
-**Prefetching**
-- Frontend caches 3 adjacent pages
-- Background loading during idle time
-- Improves perceived performance by 60-80%
+**Streaming Architecture**
+- No full file buffering in memory
+- Direct pipe from storage to HTTP response
+- Handles large files
 
-**PDF.js Configuration**
-- 128KB chunk size for optimal range requests
-- Disabled auto-fetch for manual control
-- Streaming disabled to force range requests
-
-## Performance Targets
-
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Time to First Page | < 1s | ~200-500ms |
-| Page Navigation | < 200ms | ~50-100ms (with prefetch) |
-| Memory Usage | < 250MB | ~30-80MB |
-
-## File Structure
+## Project Structure
 
 ```
 backend/
 ├── src/
-│   ├── app.ts                 # Main application
+│   ├── app.ts                  # Fastify server + routes
 │   └── utils/
-│       ├── range.ts           # Range parsing
-│       ├── pdf.ts             # Metadata extraction
-│       ├── storage.*.ts       # Storage implementations
-│       └── logger.config.ts   # Logging setup
-└── tests/                     # 57 tests (96% coverage)
-
-frontend/
-├── index.html                 # UI
-├── index.js                   # PDF viewer + prefetch
-└── style.css                  # Styles
-
-infra/
-└── docker-compose.yml         # Container orchestration
-```
-
-## Deployment
-
-```bash
-# Local development
-docker compose up -d --build
-
-# Access points
-Frontend: http://localhost:8080
-Backend:  http://localhost:3000
+│       ├── range.ts            # HTTP range header parsing
+│       ├── pdf.ts              # PDF metadata extraction
+│       ├── storage.types.ts    # Storage interface
+│       ├── storage.factory.ts  # Storage backend factory
+│       ├── storage.local.ts    # Local filesystem storage
+│       └── storage.s3.ts       # AWS S3 storage
+└── tests/
+    ├── unit/                   # Unit tests
+    └── integration/            # API integration tests
 ```
 
 ## Configuration
 
+Environment variables:
+
 ```bash
-STORAGE_TYPE=local|s3          # Storage backend
-AWS_REGION=us-east-2           # AWS region (if S3)
-AWS_S3_BUCKET=bucket-name      # S3 bucket (if S3)
+STORAGE_TYPE=local|s3          # Storage backend selection
+AWS_REGION=us-east-2           # AWS region (S3 only)
+AWS_S3_BUCKET=bucket-name      # S3 bucket name (S3 only)
 NODE_ENV=development|production
+PORT=3000                      # Server port
+```
+
+## Running Locally
+
+```bash
+# With Docker
+docker-compose up -d --build
+
+# Backend available at
+http://localhost:3000
 ```
