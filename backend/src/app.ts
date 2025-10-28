@@ -8,8 +8,10 @@ import { validateDocument, createErrorResponse } from './utils/document.js';
 import { createStorage, StorageConfig } from './utils/storage.factory.js';
 import { IStorage } from './utils/storage.types.js';
 import { createLoggerConfig, setupRequestLogging } from './utils/logger.config.js';
+import { getMetrics, recordHttpRequest, recordPdfOperation, recordStorageOperation } from './utils/metrics.js';
 import { 
   healthSchema, 
+  metricsSchema,
   documentMetadataSchema, 
   documentHeadSchema, 
   documentRangeSchema 
@@ -66,6 +68,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       ],
       tags: [
         { name: 'health', description: 'Health check endpoints' },
+        { name: 'monitoring', description: 'Metrics and monitoring endpoints' },
         { name: 'documents', description: 'PDF document operations' }
       ]
     }
@@ -85,6 +88,17 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     setupRequestLogging(app);
   }
   
+  // Add metrics collection middleware
+  app.addHook('onRequest', async (request) => {
+    (request as any).startTime = Date.now();
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const duration = (Date.now() - (request as any).startTime) / 1000;
+    const route = (request as any).routerPath || request.url.split('?')[0];
+    recordHttpRequest(request.method, route, reply.statusCode, duration);
+  });
+
   // Register routes
   app.register(async function routes(app) {
   app.get('/health', {
@@ -96,14 +110,36 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
     };
   });
 
+  app.get('/metrics', {
+    schema: metricsSchema
+  }, async (_, reply) => {
+    try {
+      const metrics = await getMetrics();
+      reply.type('text/plain; version=0.0.4; charset=utf-8');
+      return metrics;
+    } catch (error) {
+      reply.status(500);
+      return 'Error generating metrics';
+    }
+  });
+
   app.get('/api/documents/:id/metadata', {
     schema: documentMetadataSchema
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
+    const startTime = Date.now();
     
     try {
+      // Record storage operation
+      const storageStartTime = Date.now();
       const metadata = await validateDocument(id, storage);
+      recordStorageOperation('get_metadata', storageType, 'success', (Date.now() - storageStartTime) / 1000);
+      
+      // Record PDF operation
+      const pdfStartTime = Date.now();
       const pageCount = await getPdfPageCount(id, storage);
+      recordPdfOperation('metadata', 'success', (Date.now() - pdfStartTime) / 1000);
+      
       const etag = metadata.etag;
       
       const ifNoneMatch = request.headers['if-none-match'];
@@ -125,6 +161,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       };
       
     } catch (error) {
+      recordPdfOperation('metadata', 'error', (Date.now() - startTime) / 1000);
       const { status, body } = createErrorResponse(error, 'metadata');
       return reply.status(status as 404 | 500).send(body);
     }
@@ -160,13 +197,20 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const rangeHeader = request.headers['range'] as string;
+    const startTime = Date.now();
     
     try {
+      // Record storage operation
+      const storageStartTime = Date.now();
       const metadata = await validateDocument(id, storage);
+      recordStorageOperation('get_metadata', storageType, 'success', (Date.now() - storageStartTime) / 1000);
+      
       const etag = metadata.etag;
       
       if (!rangeHeader) {
+        const streamStartTime = Date.now();
         const stream = await storage.getStream(id);
+        recordStorageOperation('get_stream', storageType, 'success', (Date.now() - streamStartTime) / 1000);
         
         return reply
           .status(200)
@@ -183,6 +227,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       const range = parseRange(rangeHeader, metadata.size);
       
       if (!range || range.start >= metadata.size || range.end >= metadata.size) {
+        recordPdfOperation('range_request', 'error', (Date.now() - startTime) / 1000);
         return reply.status(416)
           .header('content-range', `bytes */${metadata.size}`)
           .send({
@@ -194,6 +239,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       const ifRange = request.headers['if-range'];
       
       if (ifRange && ifRange !== etag) {
+        recordPdfOperation('range_request', 'error', (Date.now() - startTime) / 1000);
         return reply.status(416).send({
           error: 'Range not satisfiable',
           statusCode: 416
@@ -201,7 +247,10 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       }
 
       const contentLength = range.end - range.start + 1;
+      const streamStartTime = Date.now();
       const stream = await storage.getStream(id, range);
+      recordStorageOperation('get_stream', storageType, 'success', (Date.now() - streamStartTime) / 1000);
+      recordPdfOperation('range_request', 'success', (Date.now() - startTime) / 1000);
 
       reply.status(206)
         .header('content-type', 'application/pdf')
@@ -215,6 +264,7 @@ export function createApp(config: AppConfig = {}): FastifyInstance {
       return reply.send(stream);
       
     } catch (error) {
+      recordPdfOperation('range_request', 'error', (Date.now() - startTime) / 1000);
       const { status, body } = createErrorResponse(error, 'range');
       return reply.status(status as 404 | 500).send(body);
     }

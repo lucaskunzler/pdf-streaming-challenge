@@ -17,6 +17,23 @@ export const healthSchema = {
   }
 } as const;
 
+export const metricsSchema = {
+  tags: ['monitoring'],
+  summary: 'Prometheus metrics',
+  description: 'Returns application metrics in Prometheus format for monitoring and alerting',
+  response: {
+    200: {
+      type: 'string',
+      description: 'Prometheus metrics in text format',
+      example: '# HELP http_request_duration_seconds Duration of HTTP requests in seconds\n# TYPE http_request_duration_seconds histogram\nhttp_request_duration_seconds_bucket{method="GET",route="/health",status_code="200",le="0.1"} 1\n...'
+    },
+    500: {
+      type: 'string',
+      description: 'Error generating metrics'
+    }
+  }
+} as const;
+
 export const documentMetadataSchema = {
   tags: ['documents'],
   summary: 'Get document metadata',
