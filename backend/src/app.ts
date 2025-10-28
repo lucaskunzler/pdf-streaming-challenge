@@ -290,5 +290,40 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     }
   };
   
+  // Graceful shutdown handling
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`Received ${signal}, shutting down gracefully...`);
+    
+    try {
+      // Give ongoing requests 10 seconds to complete
+      await Promise.race([
+        app.close(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Shutdown timeout')), 10000)
+        )
+      ]);
+      console.log('Server closed successfully');
+      process.exit(0);
+    } catch (err) {
+      console.error('Error during graceful shutdown:', err);
+      process.exit(1);
+    }
+  };
+  
+  // Handle termination signals
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  
+  // Handle uncaught exceptions and unhandled rejections
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    gracefulShutdown('uncaughtException');
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    gracefulShutdown('unhandledRejection');
+  });
+  
   start();
 }
